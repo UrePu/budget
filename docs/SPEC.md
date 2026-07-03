@@ -13,6 +13,8 @@
 
 ## 인증 (비밀번호 = 계정)
 - 아이디 없이 비밀번호(4자 이상)만으로 로그인. `/login` 에서 "로그인" 또는 "새 가계부 만들기"
+- 신규 가입은 **가입 코드(`REGISTER_CODE`)** 를 아는 사람만 가능 (틀리면 403).
+  `REGISTER_CODE` 를 비워두면 가입 자체가 차단됨 (기존 계정 로그인은 계속 가능)
 - 비밀번호 저장: `AUTH_SECRET` 을 pepper 로 쓰는 HMAC-SHA256(`pw-v1.<비밀번호>`)을
   `accounts.password_hmac`(unique) 에 저장. per-account salt(bcrypt류)는 비밀번호만으로
   계정을 찾을 수 없어 사용 불가 — DB 유출만으로는 pepper 없이 대입 공격 불가
@@ -25,6 +27,7 @@
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `AUTH_SECRET` (임의의 긴 랜덤 문자열 — 배포 후 유지)
+- `REGISTER_CODE` (가입 코드 — 없으면 신규 가입 차단)
 
 ## DB 스키마
 `supabase/schema.sql` 참고. 테이블: `accounts`, `transactions`(account_id 로 계정 스코프).
@@ -44,7 +47,7 @@
 - `occurred_at`: UTC ISO 저장. 입력·표시는 항상 **Asia/Seoul(한국 시간) 고정**
 
 ## API 계약 (JSON, 로그인/가입 외 모두 쿠키 인증 + 계정 스코프)
-- `POST /api/auth/login` — body `{ password, mode?: "login" | "register" }` → 200 + 쿠키 / 401(미등록) / 409(register 시 중복)
+- `POST /api/auth/login` — body `{ password, mode?: "login" | "register", code? }` → 200 + 쿠키 / 401(미등록) / 403(가입 코드 불일치) / 409(register 시 중복)
 - `POST /api/auth/logout` — 쿠키 제거
 - `POST /api/auth/password` — body `{ current, next }` → 200 / 401 / 409(중복)
 - `GET /api/transactions?month=YYYY-MM` — Asia/Seoul 기준 그 달의 거래 목록 (occurred_at 내림차순)
