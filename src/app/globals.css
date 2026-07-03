@@ -47,11 +47,3 @@ textarea,
 button {
   font: inherit;
 }
-
-/* 가로 스크롤 칩 행 — 스크롤바 숨김 */
-.no-scrollbar {
-  scrollbar-width: none;
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}

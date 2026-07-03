@@ -204,7 +204,7 @@ export default function HomeClient() {
       {/* 달력 모드: 태그 필터 버튼(항상 표시) + 달력 */}
       {mode === "calendar" && (
         <>
-          <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 py-0.5">
+          <div className="flex flex-wrap gap-1.5 py-0.5">
             {[null, ...filterTags].map((tag) => {
               const active = selectedTag === tag;
               return (
@@ -212,7 +212,7 @@ export default function HomeClient() {
                   key={tag ?? "__all__"}
                   type="button"
                   onClick={() => setSelectedTag(active ? null : tag)}
-                  className={`h-8 shrink-0 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold transition active:scale-95 ${
+                  className={`h-8 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold transition active:scale-95 ${
                     active
                       ? "bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
                       : "border border-zinc-200 dark:border-zinc-700 bg-card text-zinc-500 dark:text-zinc-400"

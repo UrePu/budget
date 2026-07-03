@@ -292,8 +292,8 @@ export default function TransactionForm({
         <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5">
           태그
         </label>
-        {/* 프리셋 + 최근 사용 태그 — 한 줄 가로 스크롤 칩, 탭 한 번에 자동 입력 */}
-        <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">
+        {/* 프리셋 + 최근 사용 태그 — 전부 보이게 여러 줄 랩, 탭 한 번에 자동 입력 */}
+        <div className="flex flex-wrap gap-1.5 py-0.5">
           {[
             ...PRESET_TAGS[currency],
             ...tagSuggestions
@@ -309,7 +309,7 @@ export default function TransactionForm({
                   changeTag(active ? "" : s);
                   setShowCustomTag(false);
                 }}
-                className={`h-8 shrink-0 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold transition active:scale-95 ${
+                className={`h-8 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold transition active:scale-95 ${
                   active
                     ? "bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
                     : "border border-zinc-200 dark:border-zinc-700 bg-transparent text-zinc-500 dark:text-zinc-400"
@@ -325,7 +325,7 @@ export default function TransactionForm({
               setShowCustomTag(!showCustomTag);
               changeTag("");
             }}
-            className={`h-8 shrink-0 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold transition active:scale-95 ${
+            className={`h-8 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold transition active:scale-95 ${
               showCustomTag
                 ? "bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
                 : "border border-dashed border-zinc-300 dark:border-zinc-600 text-zinc-400 dark:text-zinc-500"
