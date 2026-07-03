@@ -68,7 +68,8 @@ export default function TransactionForm({
     }
     return addCommas(String(editing.amount));
   });
-  const [tag, setTag] = useState(editing?.tag ?? "");
+  // 새 거래는 사냥 태그가 기본 선택 (메소 기준)
+  const [tag, setTag] = useState(editing ? (editing.tag ?? "") : SOJAE_TAG);
   // 직접 입력칸은 기본 접힘 (프리셋에 없는 태그를 수정할 땐 펼침)
   const [showCustomTag, setShowCustomTag] = useState(
     () =>
@@ -134,13 +135,14 @@ export default function TransactionForm({
     if (c === currency) return;
     setCurrency(c);
     setAmountText(""); // 단위(억 ↔ 원)가 달라지므로 금액은 다시 입력
-    setTag(""); // 통화별 프리셋이 다르므로 태그도 초기화
+    setTag(c === "meso" ? SOJAE_TAG : ""); // 메소는 사냥이 기본 선택
     setShowCustomTag(false);
   }
 
   function resetForm() {
     setAmountText("");
-    setTag("");
+    setTag(currency === "meso" ? SOJAE_TAG : "");
+    setShowCustomTag(false);
     setOccurredLocal(nowLocalInput());
     setError(null);
   }
