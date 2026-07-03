@@ -1,21 +1,19 @@
 "use client";
 
-// 거래 입력/수정 폼 — 핵심 UX
+// 입출금 입력/수정 폼 (환전은 Drawer 의 환전 폼에서 처리)
 // - 입금/출금, 메소/원 segmented 토글
 // - 메소는 억 단위로 입력 (예: 3.5 → 3억 5천만 메소), 원화는 콤마 자동 포맷
-// - 메소 선택 시 시세(1억당 원) 입력 + 실시간 환산 원화 표시
+// - 메모 대신 태그: 기존 태그 칩에서 선택하거나 새로 입력
 // - 일시(datetime-local, 한국 시간 기준 — 저장 시 UTC ISO 변환)
 import { useEffect, useRef, useState } from "react";
 import {
-  DEFAULT_RATE,
   MESO_UNIT,
-  toKrw,
   type Currency,
   type Transaction,
   type TransactionInput,
   type TxType,
 } from "@/lib/types";
-import { addCommas, formatKrw, formatMeso, parseDigits } from "@/lib/format";
+import { addCommas, formatMeso, parseDigits } from "@/lib/format";
 import {
   localInputToUtcIso,
   nowLocalInput,
@@ -23,11 +21,13 @@ import {
 } from "@/lib/client/time";
 import SegmentedControl from "@/components/SegmentedControl";
 
-const LAST_RATE_KEY = "lastRate";
+const MAX_TAG_LENGTH = 20;
 
 interface Props {
-  /** 수정 대상 (null 이면 새 거래 입력 모드) */
+  /** 수정 대상 (null 이면 새 거래 입력 모드, 환전 거래는 오지 않음) */
   editing: Transaction | null;
+  /** 최근 사용 태그 (선택 칩) */
+  tagSuggestions: string[];
   /** 401 처리가 포함된 fetch 래퍼 */
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
   /** 저장 성공 시 (목록 갱신) */
@@ -38,6 +38,7 @@ interface Props {
 
 export default function TransactionForm({
   editing,
+  tagSuggestions,
   apiFetch,
   onSaved,
   onCancelEdit,
@@ -56,11 +57,7 @@ export default function TransactionForm({
     }
     return addCommas(String(editing.amount));
   });
-  const [rateText, setRateText] = useState(() =>
-    editing && editing.currency === "meso" && editing.rate != null
-      ? String(editing.rate)
-      : String(DEFAULT_RATE),
-  );
+  const [tag, setTag] = useState(editing?.tag ?? "");
   const [occurredLocal, setOccurredLocal] = useState(() =>
     editing ? utcIsoToLocalInput(editing.occurred_at) : "",
   );
@@ -68,17 +65,11 @@ export default function TransactionForm({
   const [error, setError] = useState<string | null>(null);
   const amountRef = useRef<HTMLInputElement>(null);
 
-  // 새 거래 모드 초기화: 마지막 사용 시세 복원 + 현재 시각 세팅
+  // 새 거래 모드 초기화: 현재 시각 세팅
   // (SSR hydration mismatch 방지를 위해 마운트 후 비동기로 세팅)
   useEffect(() => {
     if (editing) return;
     const t = setTimeout(() => {
-      try {
-        const saved = localStorage.getItem(LAST_RATE_KEY);
-        if (saved && Number(saved) > 0) setRateText(saved);
-      } catch {
-        // localStorage 접근 불가 시 기본값 유지
-      }
       setOccurredLocal((prev) => prev || nowLocalInput());
     }, 0);
     return () => clearTimeout(t);
@@ -89,14 +80,6 @@ export default function TransactionForm({
     currency === "meso"
       ? Math.round((Number(amountText) || 0) * MESO_UNIT)
       : parseDigits(amountText);
-  // rate 는 API 상 소수 허용(예: 1850.5)이므로 콤마만 제거하고 Number 로 파싱한다.
-  // (parseDigits 를 쓰면 "1850.5" → 18505 로 잘못 읽힘 — 수정 모드 초기값에서 발생 가능)
-  const rateNum = Number(rateText.replace(/,/g, ""));
-  const rate = Number.isFinite(rateNum) && rateNum > 0 ? rateNum : 0;
-  const convertedKrw =
-    currency === "meso" && amount > 0 && rate > 0
-      ? toKrw({ currency: "meso", amount, rate })
-      : null;
 
   function handleAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (currency === "meso") {
@@ -121,13 +104,9 @@ export default function TransactionForm({
     setAmountText(""); // 단위(억 ↔ 원)가 달라지므로 금액은 다시 입력
   }
 
-  function handleRateChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const digits = e.target.value.replace(/[^\d]/g, "").slice(0, 7);
-    setRateText(digits);
-  }
-
   function resetForm() {
     setAmountText("");
+    setTag("");
     setOccurredLocal(nowLocalInput());
     setError(null);
   }
@@ -139,10 +118,6 @@ export default function TransactionForm({
     if (amount <= 0) {
       setError("금액을 입력해 주세요.");
       amountRef.current?.focus();
-      return;
-    }
-    if (currency === "meso" && rate <= 0) {
-      setError("시세(1억당 원)를 입력해 주세요.");
       return;
     }
     if (!occurredLocal) {
@@ -163,7 +138,8 @@ export default function TransactionForm({
       type,
       currency,
       amount,
-      rate: currency === "meso" ? rate : null,
+      rate: null,
+      tag: tag.trim() ? tag.trim() : null,
     };
 
     setSaving(true);
@@ -191,14 +167,6 @@ export default function TransactionForm({
         }
         setError(message);
         return;
-      }
-
-      if (currency === "meso" && rate > 0) {
-        try {
-          localStorage.setItem(LAST_RATE_KEY, String(rate));
-        } catch {
-          // 저장 실패 무시
-        }
       }
 
       if (editing) {
@@ -282,31 +250,43 @@ export default function TransactionForm({
         {currency === "meso" && amount > 0 && (
           <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400 tabular-nums">
             = {formatMeso(amount)}
-            {convertedKrw != null && (
-              <span className="ml-2 font-medium text-zinc-700 dark:text-zinc-300">
-                ≈ {formatKrw(convertedKrw)}
-              </span>
-            )}
           </p>
         )}
       </div>
 
-      {currency === "meso" && (
-        <div>
-          <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">
-            시세 (1억 메소당 원)
-          </label>
-          <input
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="1800"
-            value={rateText}
-            onChange={handleRateChange}
-            className="h-12 w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-transparent px-4 text-base tabular-nums outline-none focus:border-zinc-500 dark:focus:border-zinc-400"
-          />
-        </div>
-      )}
+      <div>
+        <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">
+          태그 (선택)
+        </label>
+        <input
+          type="text"
+          value={tag}
+          onChange={(e) => setTag(e.target.value.slice(0, MAX_TAG_LENGTH))}
+          placeholder="예: 보스, 사냥, 큐브"
+          className="h-12 w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-transparent px-4 text-base outline-none focus:border-zinc-500 dark:focus:border-zinc-400"
+        />
+        {tagSuggestions.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {tagSuggestions.map((s) => {
+              const active = tag.trim() === s;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setTag(active ? "" : s)}
+                  className={`h-8 rounded-full px-3 text-sm font-medium transition active:scale-95 ${
+                    active
+                      ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
+                  }`}
+                >
+                  {s}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <div>
         <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">

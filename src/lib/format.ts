@@ -41,22 +41,31 @@ export function formatSignedMeso(amount: number): string {
   return formatMeso(amount);
 }
 
-/**
- * 달력 셀용 축약 원화 표기 (부호 포함, ₩ 생략):
- * 1억 이상 "1.2억" / 1만 이상 "35만" / 그 외 "3,500"
- */
-export function formatCompactKrw(n: number): string {
+/** 축약 숫자: 1억 이상 "1.2억" / 1만 이상 "35만" / 그 외 "3,500" (부호 포함) */
+function compactNumber(n: number): { sign: string; text: string } {
   const rounded = Math.round(n);
   const sign = rounded > 0 ? "+" : rounded < 0 ? "-" : "";
   const abs = Math.abs(rounded);
   if (abs >= 100_000_000) {
     const eok = Math.round((abs / 100_000_000) * 10) / 10;
-    return `${sign}${eok}억`;
+    return { sign, text: `${eok.toLocaleString("ko-KR")}억` };
   }
   if (abs >= 10_000) {
-    return `${sign}${Math.round(abs / 10_000)}만`;
+    return { sign, text: `${Math.round(abs / 10_000).toLocaleString("ko-KR")}만` };
   }
-  return `${sign}${abs.toLocaleString("ko-KR")}`;
+  return { sign, text: abs.toLocaleString("ko-KR") };
+}
+
+/** 달력 셀용 축약 원화 표기: "+₩35만" (메소와 구분되게 ₩ 표기) */
+export function formatCompactKrw(n: number): string {
+  const { sign, text } = compactNumber(n);
+  return `${sign}₩${text}`;
+}
+
+/** 달력 셀용 축약 메소 표기: "+3.5억" */
+export function formatCompactMeso(n: number): string {
+  const { sign, text } = compactNumber(n);
+  return `${sign}${text}`;
 }
 
 /** 정수 문자열에 천단위 콤마 삽입 (입력 폼 표시용) */

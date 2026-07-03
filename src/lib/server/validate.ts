@@ -1,10 +1,16 @@
 // 거래 입력 유효성 검증 + 월 범위(UTC) 계산 유틸 — 서버 전용
 // 시간대는 한국 시간(Asia/Seoul) 고정.
 
-import type { Currency, TransactionInput, TxType } from "@/lib/types";
+import { isExchange, type Currency, type TransactionInput, type TxType } from "@/lib/types";
 
-const TX_TYPES: readonly TxType[] = ["deposit", "withdraw"];
+const TX_TYPES: readonly TxType[] = [
+  "deposit",
+  "withdraw",
+  "exchange_to_krw",
+  "exchange_to_meso",
+];
 const CURRENCIES: readonly Currency[] = ["meso", "krw"];
+const MAX_TAG_LENGTH = 20;
 
 /** 앱 전체 기준 시간대 (고정) */
 const KST = "Asia/Seoul";
@@ -23,6 +29,17 @@ function parseOccurredAt(v: unknown): string | null {
   return d.toISOString(); // UTC ISO 로 정규화하여 저장
 }
 
+/** tag 필드 검증 → 정규화(trim, 빈 문자열은 null) */
+function parseTag(v: unknown): Ok<string | null> | Err {
+  if (v === undefined || v === null) return { ok: true, value: null };
+  if (typeof v !== "string") return err("tag 는 문자열이어야 합니다.");
+  const tag = v.trim();
+  if (tag.length > MAX_TAG_LENGTH) {
+    return err(`tag 는 ${MAX_TAG_LENGTH}자 이하여야 합니다.`);
+  }
+  return { ok: true, value: tag === "" ? null : tag };
+}
+
 /** POST 본문 전체 검증 → 정규화된 TransactionInput */
 export function validateTransactionInput(
   body: unknown,
@@ -33,7 +50,9 @@ export function validateTransactionInput(
   const b = body as Record<string, unknown>;
 
   if (!TX_TYPES.includes(b.type as TxType)) {
-    return err("type 은 deposit 또는 withdraw 여야 합니다.");
+    return err(
+      "type 은 deposit/withdraw/exchange_to_krw/exchange_to_meso 여야 합니다.",
+    );
   }
   const type = b.type as TxType;
 
@@ -47,15 +66,19 @@ export function validateTransactionInput(
   }
   const amount = b.amount;
 
+  // 환전: currency=meso 고정 + rate 필수 / 입출금: rate 없음
   let rate: number | null;
-  if (currency === "meso") {
+  if (isExchange(type)) {
+    if (currency !== "meso") {
+      return err("환전 거래의 currency 는 meso(amount=메소 양)여야 합니다.");
+    }
     if (typeof b.rate !== "number" || !Number.isFinite(b.rate) || b.rate <= 0) {
-      return err("메소 거래는 rate(1억당 원, 0보다 큰 숫자)가 필요합니다.");
+      return err("환전 거래는 rate(1억당 원, 0보다 큰 숫자)가 필요합니다.");
     }
     rate = b.rate;
   } else {
     if (b.rate !== null && b.rate !== undefined) {
-      return err("원화 거래의 rate 는 null 이어야 합니다.");
+      return err("입출금 거래의 rate 는 null 이어야 합니다.");
     }
     rate = null;
   }
@@ -65,22 +88,22 @@ export function validateTransactionInput(
     return err("occurred_at 은 ISO 형식 날짜여야 합니다.");
   }
 
-  let memo: string | null = null;
-  if (b.memo !== undefined && b.memo !== null) {
-    if (typeof b.memo !== "string") return err("memo 는 문자열이어야 합니다.");
-    memo = b.memo.trim() === "" ? null : b.memo;
-  }
+  const tagResult = parseTag(b.tag);
+  if (!tagResult.ok) return tagResult;
 
-  return { ok: true, value: { occurred_at, type, currency, amount, rate, memo } };
+  return {
+    ok: true,
+    value: { occurred_at, type, currency, amount, rate, tag: tagResult.value },
+  };
 }
 
 /**
  * PATCH 부분 수정 검증 — 제공된 필드만 검증해 update 객체를 만든다.
- * currency/rate 정합성은 기존 레코드와 병합한 결과 기준으로 확인한다.
+ * type/currency/rate 정합성은 기존 레코드와 병합한 결과 기준으로 확인한다.
  */
 export function validateTransactionPatch(
   body: unknown,
-  existing: { currency: Currency; rate: number | null },
+  existing: { type: TxType; currency: Currency; rate: number | null },
 ): Ok<Partial<TransactionInput>> | Err {
   if (typeof body !== "object" || body === null) {
     return err("잘못된 요청 본문입니다.");
@@ -90,7 +113,9 @@ export function validateTransactionPatch(
 
   if ("type" in b) {
     if (!TX_TYPES.includes(b.type as TxType)) {
-      return err("type 은 deposit 또는 withdraw 여야 합니다.");
+      return err(
+        "type 은 deposit/withdraw/exchange_to_krw/exchange_to_meso 여야 합니다.",
+      );
     }
     patch.type = b.type as TxType;
   }
@@ -125,29 +150,29 @@ export function validateTransactionPatch(
     patch.occurred_at = iso;
   }
 
-  if ("memo" in b) {
-    if (b.memo === null) {
-      patch.memo = null;
-    } else if (typeof b.memo === "string") {
-      patch.memo = b.memo.trim() === "" ? null : b.memo;
-    } else {
-      return err("memo 는 문자열 또는 null 이어야 합니다.");
-    }
+  if ("tag" in b) {
+    const tagResult = parseTag(b.tag);
+    if (!tagResult.ok) return tagResult;
+    patch.tag = tagResult.value;
   }
 
   if (Object.keys(patch).length === 0) {
     return err("수정할 필드가 없습니다.");
   }
 
-  // 병합 후 currency ↔ rate 정합성 검사
+  // 병합 후 type ↔ currency ↔ rate 정합성 검사
+  const mergedType = patch.type ?? existing.type;
   const mergedCurrency = patch.currency ?? existing.currency;
   const mergedRate = "rate" in patch ? (patch.rate ?? null) : existing.rate;
-  if (mergedCurrency === "meso") {
+  if (isExchange(mergedType)) {
+    if (mergedCurrency !== "meso") {
+      return err("환전 거래의 currency 는 meso(amount=메소 양)여야 합니다.");
+    }
     if (typeof mergedRate !== "number" || mergedRate <= 0) {
-      return err("메소 거래는 rate(1억당 원, 0보다 큰 숫자)가 필요합니다.");
+      return err("환전 거래는 rate(1억당 원, 0보다 큰 숫자)가 필요합니다.");
     }
   } else if (mergedRate !== null) {
-    // krw 로 바꾸면서 rate 를 명시적으로 null 로 주지 않았다면 자동으로 null 처리
+    // 입출금으로 바꾸면서 rate 를 명시적으로 null 로 주지 않았다면 자동으로 null 처리
     patch.rate = null;
   }
 

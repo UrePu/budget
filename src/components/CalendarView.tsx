@@ -1,10 +1,11 @@
 "use client";
 
-// 월 달력 그리드 — 날짜별 순액(원화 환산)을 표시하고, 날짜를 탭하면 그 날만 모아본다.
-// 다시 탭하면 선택 해제(월 전체 보기).
+// 월 달력 그리드 — 날짜별 메소/원화 순변화를 각각 표시하고,
+// 날짜를 탭하면 그 날만 모아본다. 다시 탭하면 선택 해제(월 전체 보기).
+// (전달받은 transactions 는 이미 태그 필터가 적용된 상태)
 
-import { toKrw, type Transaction } from "@/lib/types";
-import { formatCompactKrw } from "@/lib/format";
+import { balanceDeltas, type Transaction } from "@/lib/types";
+import { formatCompactKrw, formatCompactMeso } from "@/lib/format";
 import { dateKey, todayDateKey } from "@/lib/client/time";
 
 const WEEKDAY_HEADER = ["일", "월", "화", "수", "목", "금", "토"];
@@ -12,7 +13,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
 
 interface Props {
   month: string; // "YYYY-MM"
-  transactions: Transaction[]; // 그 달 전체 거래
+  transactions: Transaction[]; // 그 달 전체 거래 (태그 필터 적용됨)
   selectedDate: string | null; // "YYYY-MM-DD" | null
   onSelectDate: (dateKey: string | null) => void;
 }
@@ -25,12 +26,15 @@ export default function CalendarView({
 }: Props) {
   const [year, mon] = month.split("-").map(Number);
 
-  // 날짜별 순액(원화 환산) 집계
-  const netByDate = new Map<string, number>();
+  // 날짜별 메소/원화 순변화 집계
+  const netByDate = new Map<string, { meso: number; krw: number }>();
   for (const t of transactions) {
     const key = dateKey(t.occurred_at);
-    const signed = (t.type === "deposit" ? 1 : -1) * toKrw(t);
-    netByDate.set(key, (netByDate.get(key) ?? 0) + signed);
+    const d = balanceDeltas(t);
+    const acc = netByDate.get(key) ?? { meso: 0, krw: 0 };
+    acc.meso += d.meso;
+    acc.krw += d.krw;
+    netByDate.set(key, acc);
   }
 
   const firstDow = new Date(Date.UTC(year, mon - 1, 1)).getUTCDay(); // 0=일
@@ -42,6 +46,13 @@ export default function CalendarView({
     ...Array.from({ length: firstDow }, () => null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
+
+  const deltaClass = (n: number, selected: boolean) =>
+    selected
+      ? ""
+      : n > 0
+        ? "text-emerald-600 dark:text-emerald-400"
+        : "text-red-600 dark:text-red-400";
 
   return (
     <div className="rounded-2xl bg-card border border-black/5 dark:border-white/10 p-2 shadow-sm">
@@ -76,7 +87,7 @@ export default function CalendarView({
               aria-label={`${mon}월 ${day}일`}
               aria-pressed={isSelected}
               onClick={() => onSelectDate(isSelected ? null : key)}
-              className={`flex h-12 flex-col items-center justify-start rounded-lg pt-1 transition active:scale-95 ${
+              className={`flex h-14 flex-col items-center justify-start rounded-lg pt-1 transition active:scale-95 ${
                 isSelected
                   ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
                   : "active:bg-zinc-100 dark:active:bg-zinc-800"
@@ -99,19 +110,18 @@ export default function CalendarView({
               >
                 {day}
               </span>
-              {net !== undefined && (
+              {net && net.meso !== 0 && (
                 <span
-                  className={`mt-0.5 max-w-full truncate px-0.5 text-[10px] font-semibold tabular-nums ${
-                    isSelected
-                      ? ""
-                      : net > 0
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : net < 0
-                          ? "text-red-600 dark:text-red-400"
-                          : "text-zinc-500 dark:text-zinc-400"
-                  }`}
+                  className={`max-w-full truncate px-0.5 text-[9px] font-semibold leading-tight tabular-nums ${deltaClass(net.meso, isSelected)}`}
                 >
-                  {formatCompactKrw(net)}
+                  {formatCompactMeso(net.meso)}
+                </span>
+              )}
+              {net && net.krw !== 0 && (
+                <span
+                  className={`max-w-full truncate px-0.5 text-[9px] font-semibold leading-tight tabular-nums ${deltaClass(net.krw, isSelected)}`}
+                >
+                  {formatCompactKrw(net.krw)}
                 </span>
               )}
             </button>

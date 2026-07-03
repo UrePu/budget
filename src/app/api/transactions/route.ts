@@ -3,7 +3,7 @@
 // POST /api/transactions — 거래 생성
 
 import { NextResponse } from "next/server";
-import { isAuthenticated } from "@/lib/server/auth";
+import { getSessionAccountId } from "@/lib/server/auth";
 import { getSupabase } from "@/lib/server/supabase";
 import {
   dayRangeUtc,
@@ -13,7 +13,8 @@ import {
 import type { Transaction } from "@/lib/types";
 
 export async function GET(request: Request) {
-  if (!(await isAuthenticated())) {
+  const accountId = await getSessionAccountId();
+  if (!accountId) {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
   }
 
@@ -51,6 +52,7 @@ export async function GET(request: Request) {
   let query = getSupabase()
     .from("transactions")
     .select("*")
+    .eq("account_id", accountId)
     .order("occurred_at", { ascending: false });
 
   if (range) {
@@ -69,7 +71,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAuthenticated())) {
+  const accountId = await getSessionAccountId();
+  if (!accountId) {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
   }
 
@@ -90,7 +93,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await getSupabase()
     .from("transactions")
-    .insert(result.value)
+    .insert({ ...result.value, account_id: accountId })
     .select()
     .single();
 

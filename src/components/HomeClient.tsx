@@ -3,7 +3,7 @@
 // 메인 화면 클라이언트 컴포넌트 — 상태 관리 및 API 연동
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Transaction } from "@/lib/types";
+import { isExchange, type Transaction } from "@/lib/types";
 import {
   currentMonth,
   dateKey,
@@ -12,6 +12,7 @@ import {
   weekStartOf,
 } from "@/lib/client/time";
 import CalendarView from "@/components/CalendarView";
+import Drawer from "@/components/Drawer";
 import PeriodPicker, { type PeriodMode } from "@/components/PeriodPicker";
 import SummaryCards from "@/components/SummaryCards";
 import TransactionForm from "@/components/TransactionForm";
@@ -24,10 +25,17 @@ export default function HomeClient() {
   const [weekStart, setWeekStart] = useState(() => weekStartOf(todayDateKey()));
   // 달력 모드에서 선택한 날짜 (null 이면 월 전체)
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // 달력 모드 태그 필터 (null 이면 전체)
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  // 환전 거래 수정 대상 (Drawer 의 환전 폼으로 열림)
+  const [editingExchange, setEditingExchange] = useState<Transaction | null>(
+    null,
+  );
   const formRef = useRef<HTMLDivElement>(null);
 
   // 401 이면 /login 으로 이동하는 fetch 래퍼
@@ -84,13 +92,41 @@ export default function HomeClient() {
     router.refresh();
   }
 
-  // 달력 모드에서 날짜를 선택하면 요약/목록을 그 날로 좁힌다
+  // 최근 사용 태그 (입력 폼 칩)
+  const tagSuggestions = Array.from(
+    new Set(
+      transactions
+        .map((t) => t.tag)
+        .filter((tag): tag is string => tag !== null),
+    ),
+  ).slice(0, 8);
+
+  // 달력 모드: 태그 필터 → 날짜 선택 순으로 좁힌다
+  const tagFiltered =
+    mode === "calendar" && selectedTag
+      ? transactions.filter((t) => t.tag === selectedTag)
+      : transactions;
   const visibleTransactions =
     mode === "calendar" && selectedDate
-      ? transactions.filter((t) => dateKey(t.occurred_at) === selectedDate)
-      : transactions;
+      ? tagFiltered.filter((t) => dateKey(t.occurred_at) === selectedDate)
+      : tagFiltered;
+
+  // 달력 태그 필터 후보 (이 달에 실제로 쓰인 태그)
+  const monthTags = Array.from(
+    new Set(
+      transactions
+        .map((t) => t.tag)
+        .filter((tag): tag is string => tag !== null),
+    ),
+  );
 
   function handleEdit(t: Transaction) {
+    if (isExchange(t.type)) {
+      // 환전 거래는 Drawer 의 환전 폼으로 수정
+      setEditingExchange(t);
+      setDrawerOpen(true);
+      return;
+    }
     setEditing(t);
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -103,6 +139,7 @@ export default function HomeClient() {
       });
       if (res.ok) {
         if (editing?.id === t.id) setEditing(null);
+        if (editingExchange?.id === t.id) setEditingExchange(null);
         setTransactions((prev) => prev.filter((x) => x.id !== t.id));
       } else {
         window.alert("삭제에 실패했습니다.");
@@ -117,16 +154,33 @@ export default function HomeClient() {
   return (
     <main className="mx-auto w-full max-w-md px-4 pb-16 pt-4 flex flex-col gap-4">
       {/* 헤더 */}
-      <header className="flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight">메소 가계부</h1>
+      <header className="flex items-center gap-2">
         <button
           type="button"
-          onClick={handleLogout}
-          className="h-9 rounded-lg px-3 text-sm font-medium text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 active:scale-95 transition"
+          aria-label="메뉴 열기"
+          onClick={() => setDrawerOpen(true)}
+          className="h-10 w-10 rounded-xl text-xl text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 active:scale-95 transition"
         >
-          로그아웃
+          ☰
         </button>
+        <h1 className="text-xl font-bold tracking-tight">메소 가계부</h1>
       </header>
+
+      {/* 왼쪽 Drawer: 환전 / 비밀번호 변경 / 로그아웃 */}
+      <Drawer
+        open={drawerOpen}
+        onClose={() => {
+          setDrawerOpen(false);
+          setEditingExchange(null);
+        }}
+        editingExchange={editingExchange}
+        apiFetch={apiFetch}
+        onSaved={() => {
+          setEditingExchange(null);
+          loadTransactions();
+        }}
+        onLogout={handleLogout}
+      />
 
       {/* 기간 선택 (월간/주간/달력) */}
       <PeriodPicker
@@ -136,25 +190,60 @@ export default function HomeClient() {
         onModeChange={(m) => {
           setMode(m);
           setSelectedDate(null);
+          setSelectedTag(null);
         }}
         onMonthChange={(m) => {
           setMonth(m);
           setSelectedDate(null);
+          setSelectedTag(null);
         }}
         onWeekChange={setWeekStart}
       />
 
-      {/* 달력 (달력 모드) */}
+      {/* 달력 모드: 태그 필터 + 달력 */}
       {mode === "calendar" && (
-        <CalendarView
-          month={month}
-          transactions={transactions}
-          selectedDate={selectedDate}
-          onSelectDate={setSelectedDate}
-        />
+        <>
+          {monthTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setSelectedTag(null)}
+                className={`h-8 rounded-full px-3 text-sm font-medium transition active:scale-95 ${
+                  selectedTag === null
+                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
+                }`}
+              >
+                전체
+              </button>
+              {monthTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() =>
+                    setSelectedTag(selectedTag === tag ? null : tag)
+                  }
+                  className={`h-8 rounded-full px-3 text-sm font-medium transition active:scale-95 ${
+                    selectedTag === tag
+                      ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
+                  }`}
+                >
+                  #{tag}
+                </button>
+              ))}
+            </div>
+          )}
+          <CalendarView
+            month={month}
+            transactions={tagFiltered}
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+          />
+        </>
       )}
 
-      {/* 요약 카드 — 달력에서 날짜 선택 시 그 날 기준 */}
+      {/* 요약 카드 — 메소/원화 각각 집계 (필터 반영) */}
       <SummaryCards transactions={visibleTransactions} />
 
       {/* 입력/수정 폼 */}
@@ -162,6 +251,7 @@ export default function HomeClient() {
         <TransactionForm
           key={editing ? editing.id : "new"}
           editing={editing}
+          tagSuggestions={tagSuggestions}
           apiFetch={apiFetch}
           onSaved={loadTransactions}
           onCancelEdit={() => setEditing(null)}
@@ -184,7 +274,7 @@ export default function HomeClient() {
         <TransactionList
           transactions={visibleTransactions}
           loading={loading}
-          editingId={editing?.id ?? null}
+          editingId={editing?.id ?? editingExchange?.id ?? null}
           onEdit={handleEdit}
           onDelete={handleDelete}
         />

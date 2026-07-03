@@ -10,7 +10,7 @@ export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  if (await verifySessionToken(token)) {
+  if ((await verifySessionToken(token)) !== null) {
     return NextResponse.next();
   }
 

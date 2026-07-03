@@ -3,7 +3,7 @@
 // Next.js 16: params 는 Promise 이므로 await 해서 사용한다.
 
 import { NextResponse } from "next/server";
-import { isAuthenticated } from "@/lib/server/auth";
+import { getSessionAccountId } from "@/lib/server/auth";
 import { getSupabase } from "@/lib/server/supabase";
 import { validateTransactionPatch } from "@/lib/server/validate";
 import type { Transaction } from "@/lib/types";
@@ -14,7 +14,8 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function PATCH(request: Request, context: RouteContext) {
-  if (!(await isAuthenticated())) {
+  const accountId = await getSessionAccountId();
+  if (!accountId) {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
   }
 
@@ -35,11 +36,12 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const supabase = getSupabase();
 
-  // currency ↔ rate 정합성 검사를 위해 기존 레코드를 먼저 조회
+  // type/currency ↔ rate 정합성 검사를 위해 기존 레코드를 먼저 조회 (계정 스코프)
   const { data: existing, error: fetchError } = await supabase
     .from("transactions")
-    .select("currency, rate")
+    .select("type, currency, rate")
     .eq("id", id)
+    .eq("account_id", accountId)
     .maybeSingle();
 
   if (fetchError) {
@@ -64,6 +66,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     .from("transactions")
     .update(result.value)
     .eq("id", id)
+    .eq("account_id", accountId)
     .select()
     .single();
 
@@ -78,7 +81,8 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
-  if (!(await isAuthenticated())) {
+  const accountId = await getSessionAccountId();
+  if (!accountId) {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
   }
 
@@ -91,6 +95,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     .from("transactions")
     .delete()
     .eq("id", id)
+    .eq("account_id", accountId)
     .select("id");
 
   if (error) {

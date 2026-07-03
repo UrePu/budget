@@ -1,9 +1,14 @@
-// 세션 토큰 생성/검증 — AUTH_SECRET 기반 HMAC-SHA256 서명.
+// 세션 토큰 생성/검증 + 비밀번호 해시 — AUTH_SECRET 기반 HMAC-SHA256.
 // proxy(구 middleware)는 edge 런타임에서도 돌 수 있으므로 Node `crypto` 모듈 대신
 // Web Crypto API(globalThis.crypto.subtle)만 사용한다. (Node 18+ / edge 모두 지원)
 //
-// 토큰 형식: "<만료시각(unix ms)>.<HMAC(base64url)>"
-// HMAC 대상 문자열: "session-v1.<만료시각>"
+// 세션 토큰 형식: "<만료시각(unix ms)>.<계정 id>.<HMAC(base64url)>"
+// HMAC 대상 문자열: "session-v1.<만료시각>.<계정 id>"
+//
+// 비밀번호 저장: 아이디 없이 비밀번호만으로 계정을 찾아야 하므로 per-account salt
+// 방식(bcrypt 등)은 조회가 불가능하다. 대신 AUTH_SECRET 을 pepper 로 쓰는
+// HMAC-SHA256("pw-v1.<비밀번호>") 값을 저장하고 unique 인덱스로 조회한다.
+// DB 만 유출돼서는 pepper(서버 환경변수) 없이 대입 공격이 불가능하다.
 
 import { cookies } from "next/headers";
 
@@ -12,7 +17,8 @@ export const SESSION_COOKIE = "session";
 /** 세션 만료: 30일 (초) */
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 
-const PAYLOAD_PREFIX = "session-v1";
+const SESSION_PREFIX = "session-v1";
+const PASSWORD_PREFIX = "pw-v1";
 
 function getAuthSecret(): string {
   const secret = process.env.AUTH_SECRET;
@@ -60,44 +66,47 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-/** 지금부터 30일 뒤 만료되는 세션 토큰을 생성한다. */
-export async function createSessionToken(): Promise<string> {
+/** 비밀번호 → 저장/조회용 HMAC 해시 (accounts.password_hmac) */
+export async function hashPassword(password: string): Promise<string> {
+  return sign(`${PASSWORD_PREFIX}.${password}`, getAuthSecret());
+}
+
+/** 지금부터 30일 뒤 만료되는, 계정 id 가 포함된 세션 토큰을 생성한다. */
+export async function createSessionToken(accountId: string): Promise<string> {
   const exp = Date.now() + SESSION_MAX_AGE * 1000;
-  const sig = await sign(`${PAYLOAD_PREFIX}.${exp}`, getAuthSecret());
-  return `${exp}.${sig}`;
+  const sig = await sign(`${SESSION_PREFIX}.${exp}.${accountId}`, getAuthSecret());
+  return `${exp}.${accountId}.${sig}`;
 }
 
 /**
- * 세션 토큰 검증 — 서명 일치 + 만료 전이면 true.
+ * 세션 토큰 검증 — 서명 일치 + 만료 전이면 계정 id, 아니면 null.
  * Web Crypto 만 사용하므로 edge(proxy)/Node(route handler) 어디서든 호출 가능.
  */
 export async function verifySessionToken(
   token: string | undefined | null,
-): Promise<boolean> {
-  if (!token) return false;
-  const dot = token.indexOf(".");
-  if (dot <= 0) return false;
+): Promise<string | null> {
+  if (!token) return null;
+  const [expStr, accountId, sig] = token.split(".");
+  if (!expStr || !accountId || !sig) return null;
 
-  const expStr = token.slice(0, dot);
-  const sig = token.slice(dot + 1);
   const exp = Number(expStr);
-  if (!Number.isFinite(exp) || exp < Date.now()) return false;
+  if (!Number.isFinite(exp) || exp < Date.now()) return null;
 
   let secret: string;
   try {
     secret = getAuthSecret();
   } catch {
-    return false;
+    return null;
   }
-  const expected = await sign(`${PAYLOAD_PREFIX}.${expStr}`, secret);
-  return timingSafeEqual(sig, expected);
+  const expected = await sign(`${SESSION_PREFIX}.${expStr}.${accountId}`, secret);
+  return timingSafeEqual(sig, expected) ? accountId : null;
 }
 
 /**
- * route handler 용: 요청 쿠키의 세션이 유효한지 검사.
+ * route handler 용: 요청 쿠키의 세션이 유효하면 계정 id, 아니면 null.
  * Next.js 16 에서 cookies() 는 async.
  */
-export async function isAuthenticated(): Promise<boolean> {
+export async function getSessionAccountId(): Promise<string | null> {
   const cookieStore = await cookies();
   return verifySessionToken(cookieStore.get(SESSION_COOKIE)?.value);
 }
