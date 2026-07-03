@@ -204,34 +204,24 @@ export default function HomeClient() {
       {/* 달력 모드: 태그 필터 버튼(항상 표시) + 달력 */}
       {mode === "calendar" && (
         <>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              onClick={() => setSelectedTag(null)}
-              className={`h-8 rounded-full px-3 text-sm font-medium transition active:scale-95 ${
-                selectedTag === null
-                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
-              }`}
-            >
-              전체
-            </button>
-            {filterTags.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() =>
-                  setSelectedTag(selectedTag === tag ? null : tag)
-                }
-                className={`h-8 rounded-full px-3 text-sm font-medium transition active:scale-95 ${
-                  selectedTag === tag
-                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
-                }`}
-              >
-                #{tag}
-              </button>
-            ))}
+          <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 py-0.5">
+            {[null, ...filterTags].map((tag) => {
+              const active = selectedTag === tag;
+              return (
+                <button
+                  key={tag ?? "__all__"}
+                  type="button"
+                  onClick={() => setSelectedTag(active ? null : tag)}
+                  className={`h-8 shrink-0 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold transition active:scale-95 ${
+                    active
+                      ? "bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
+                      : "border border-zinc-200 dark:border-zinc-700 bg-card text-zinc-500 dark:text-zinc-400"
+                  }`}
+                >
+                  {tag === null ? "전체" : `#${tag}`}
+                </button>
+              );
+            })}
           </div>
           <CalendarView
             month={month}
