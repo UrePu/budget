@@ -11,6 +11,7 @@ import {
   todayDateKey,
   weekStartOf,
 } from "@/lib/client/time";
+import { ALL_PRESET_TAGS } from "@/lib/tags";
 import CalendarView from "@/components/CalendarView";
 import Drawer from "@/components/Drawer";
 import PeriodPicker, { type PeriodMode } from "@/components/PeriodPicker";
@@ -110,13 +111,14 @@ export default function HomeClient() {
       ? tagFiltered.filter((t) => dateKey(t.occurred_at) === selectedDate)
       : tagFiltered;
 
-  // 달력 태그 필터 후보 (이 달에 실제로 쓰인 태그)
-  const monthTags = Array.from(
-    new Set(
-      transactions
+  // 달력 태그 필터 버튼 — 프리셋은 항상 표시, 이 달에 쓰인 커스텀 태그를 뒤에 병합
+  const filterTags = Array.from(
+    new Set([
+      ...ALL_PRESET_TAGS,
+      ...transactions
         .map((t) => t.tag)
         .filter((tag): tag is string => tag !== null),
-    ),
+    ]),
   );
 
   function handleEdit(t: Transaction) {
@@ -199,40 +201,38 @@ export default function HomeClient() {
         onWeekChange={setWeekStart}
       />
 
-      {/* 달력 모드: 태그 필터 + 달력 */}
+      {/* 달력 모드: 태그 필터 버튼(항상 표시) + 달력 */}
       {mode === "calendar" && (
         <>
-          {monthTags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={() => setSelectedTag(null)}
+              className={`h-8 rounded-full px-3 text-sm font-medium transition active:scale-95 ${
+                selectedTag === null
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
+              }`}
+            >
+              전체
+            </button>
+            {filterTags.map((tag) => (
               <button
+                key={tag}
                 type="button"
-                onClick={() => setSelectedTag(null)}
+                onClick={() =>
+                  setSelectedTag(selectedTag === tag ? null : tag)
+                }
                 className={`h-8 rounded-full px-3 text-sm font-medium transition active:scale-95 ${
-                  selectedTag === null
+                  selectedTag === tag
                     ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
                     : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
                 }`}
               >
-                전체
+                #{tag}
               </button>
-              {monthTags.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() =>
-                    setSelectedTag(selectedTag === tag ? null : tag)
-                  }
-                  className={`h-8 rounded-full px-3 text-sm font-medium transition active:scale-95 ${
-                    selectedTag === tag
-                      ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
-                  }`}
-                >
-                  #{tag}
-                </button>
-              ))}
-            </div>
-          )}
+            ))}
+          </div>
           <CalendarView
             month={month}
             transactions={tagFiltered}
@@ -245,15 +245,17 @@ export default function HomeClient() {
       {/* 요약 카드 — 메소/원화 각각 집계 (필터 반영) */}
       <SummaryCards transactions={visibleTransactions} />
 
-      {/* 새 거래 입력 폼 (수정은 목록 항목 탭 → 바텀시트) */}
-      <TransactionForm
-        key="new"
-        editing={null}
-        tagSuggestions={tagSuggestions}
-        apiFetch={apiFetch}
-        onSaved={loadTransactions}
-        onCancelEdit={() => {}}
-      />
+      {/* 새 거래 입력 폼 — 달력 탭은 모아보기 전용이라 숨김 (수정은 목록 항목 탭 → 바텀시트) */}
+      {mode !== "calendar" && (
+        <TransactionForm
+          key="new"
+          editing={null}
+          tagSuggestions={tagSuggestions}
+          apiFetch={apiFetch}
+          onSaved={loadTransactions}
+          onCancelEdit={() => {}}
+        />
+      )}
 
       {/* 수정 바텀시트 — 목록의 기록을 탭하면 열린다 */}
       {editing && (

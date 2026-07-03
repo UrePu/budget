@@ -12,6 +12,7 @@ import {
   type TxType,
 } from "@/lib/types";
 import { formatKrw, formatMeso } from "@/lib/format";
+import { EXCHANGE_TAG } from "@/lib/tags";
 import {
   localInputToUtcIso,
   nowLocalInput,
@@ -213,7 +214,7 @@ function ExchangeForm({
       currency: "meso" as const,
       amount,
       rate,
-      tag: "환전",
+      tag: EXCHANGE_TAG,
     };
 
     setSaving(true);
