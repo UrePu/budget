@@ -52,14 +52,14 @@ export default function TransactionForm({
   );
   const [amountText, setAmountText] = useState(() => {
     if (!editing) return "";
-    // 메소: 사냥 태그면 소재 수, 아니면 억 단위 소수로 표시. 원화는 콤마 포맷
+    // 메소: 재획 태그면 소재 수, 아니면 억 단위 소수로 표시. 원화는 콤마 포맷
     if (editing.currency === "meso") {
       const unit = editing.tag === SOJAE_TAG ? MESO_PER_SOJAE : MESO_UNIT;
       return String(Math.round((editing.amount / unit) * 10_000) / 10_000);
     }
     return addCommas(String(editing.amount));
   });
-  // 새 거래는 사냥 태그가 기본 선택 (메소 기준)
+  // 새 거래는 재획 태그가 기본 선택 (메소 기준)
   const [tag, setTag] = useState(editing ? (editing.tag ?? "") : SOJAE_TAG);
   // 직접 입력칸은 기본 접힘 (프리셋에 없는 태그를 수정할 땐 펼침)
   const [showCustomTag, setShowCustomTag] = useState(
@@ -84,7 +84,7 @@ export default function TransactionForm({
     return () => clearTimeout(t);
   }, [editing]);
 
-  // 메소: 사냥 태그면 소재 수("2" → 2.6억), 아니면 억 단위 소수("3.5" → 3억 5천만).
+  // 메소: 재획 태그면 소재 수("2" → 2.6억), 아니면 억 단위 소수("3.5" → 3억 5천만).
   // 원화는 정수(원) 입력
   const isSojae = currency === "meso" && tag.trim() === SOJAE_TAG;
   const amount =
@@ -94,7 +94,7 @@ export default function TransactionForm({
         )
       : parseDigits(amountText);
 
-  /** 태그 변경 — 사냥 여부가 바뀌면 금액 단위(소재 ↔ 억)가 달라지므로 금액 초기화 */
+  /** 태그 변경 — 재획 여부가 바뀌면 금액 단위(소재 ↔ 억)가 달라지므로 금액 초기화 */
   function changeTag(next: string) {
     if (
       currency === "meso" &&
@@ -126,7 +126,7 @@ export default function TransactionForm({
     if (c === currency) return;
     setCurrency(c);
     setAmountText(""); // 단위(억 ↔ 원)가 달라지므로 금액은 다시 입력
-    setTag(c === "meso" ? SOJAE_TAG : ""); // 메소는 사냥이 기본 선택
+    setTag(c === "meso" ? SOJAE_TAG : ""); // 메소는 재획이 기본 선택
     setShowCustomTag(false);
   }
 

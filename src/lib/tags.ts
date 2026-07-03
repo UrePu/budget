@@ -4,12 +4,12 @@ import type { Currency } from "@/lib/types";
 
 /** 통화별 기본 태그 — 작은 버튼으로 탭 한 번에 입력 */
 export const PRESET_TAGS: Record<Currency, string[]> = {
-  meso: ["사냥", "보스", "재획", "큐브", "스타포스", "아이템"],
+  meso: ["재획", "보스", "큐브", "스타포스", "아이템"],
   krw: ["현금화", "충전", "아이템", "기타"],
 };
 
-/** 사냥 태그 전용: 1소재(소울 재획) = 1.3억 메소 — 소재 수로 입력 */
-export const SOJAE_TAG = "사냥";
+/** 재획 태그 전용: 1소재(소울 재획) = 1.3억 메소 — 소재 수로 입력 */
+export const SOJAE_TAG = "재획";
 export const MESO_PER_SOJAE = 130_000_000;
 
 /** 환전 거래에 자동으로 붙는 태그 */
