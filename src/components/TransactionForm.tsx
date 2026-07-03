@@ -23,6 +23,12 @@ import SegmentedControl from "@/components/SegmentedControl";
 
 const MAX_TAG_LENGTH = 20;
 
+// 통화별 기본 태그 — 작은 버튼으로 탭 한 번에 입력
+const PRESET_TAGS: Record<Currency, string[]> = {
+  meso: ["사냥", "보스", "재획", "큐브", "스타포스", "아이템"],
+  krw: ["현금화", "충전", "아이템", "기타"],
+};
+
 interface Props {
   /** 수정 대상 (null 이면 새 거래 입력 모드, 환전 거래는 오지 않음) */
   editing: Transaction | null;
@@ -58,6 +64,12 @@ export default function TransactionForm({
     return addCommas(String(editing.amount));
   });
   const [tag, setTag] = useState(editing?.tag ?? "");
+  // 직접 입력칸은 기본 접힘 (프리셋에 없는 태그를 수정할 땐 펼침)
+  const [showCustomTag, setShowCustomTag] = useState(
+    () =>
+      !!editing?.tag &&
+      !PRESET_TAGS[editing.currency].includes(editing.tag),
+  );
   const [occurredLocal, setOccurredLocal] = useState(() =>
     editing ? utcIsoToLocalInput(editing.occurred_at) : "",
   );
@@ -102,6 +114,8 @@ export default function TransactionForm({
     if (c === currency) return;
     setCurrency(c);
     setAmountText(""); // 단위(억 ↔ 원)가 달라지므로 금액은 다시 입력
+    setTag(""); // 통화별 프리셋이 다르므로 태그도 초기화
+    setShowCustomTag(false);
   }
 
   function resetForm() {
@@ -258,33 +272,62 @@ export default function TransactionForm({
         <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">
           태그 (선택)
         </label>
-        <input
-          type="text"
-          value={tag}
-          onChange={(e) => setTag(e.target.value.slice(0, MAX_TAG_LENGTH))}
-          placeholder="예: 보스, 사냥, 큐브"
-          className="h-12 w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-transparent px-4 text-base outline-none focus:border-zinc-500 dark:focus:border-zinc-400"
-        />
-        {tagSuggestions.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {tagSuggestions.map((s) => {
-              const active = tag.trim() === s;
-              return (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setTag(active ? "" : s)}
-                  className={`h-8 rounded-full px-3 text-sm font-medium transition active:scale-95 ${
-                    active
-                      ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
-                  }`}
-                >
-                  {s}
-                </button>
-              );
-            })}
-          </div>
+        {/* 프리셋 + 최근 사용 태그를 작은 버튼으로 — 탭 한 번에 자동 입력 */}
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            ...PRESET_TAGS[currency],
+            ...tagSuggestions
+              .filter((s) => !PRESET_TAGS[currency].includes(s))
+              .slice(0, 4),
+          ].map((s) => {
+            const active = tag.trim() === s;
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => {
+                  setTag(active ? "" : s);
+                  setShowCustomTag(false);
+                }}
+                className={`h-9 rounded-full px-3.5 text-sm font-medium transition active:scale-95 ${
+                  active
+                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"
+                }`}
+              >
+                {s}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => {
+              if (showCustomTag) {
+                setShowCustomTag(false);
+                setTag("");
+              } else {
+                setShowCustomTag(true);
+                setTag("");
+              }
+            }}
+            className={`h-9 rounded-full px-3.5 text-sm font-medium transition active:scale-95 ${
+              showCustomTag
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
+            }`}
+          >
+            직접 입력…
+          </button>
+        </div>
+        {showCustomTag && (
+          <input
+            type="text"
+            value={tag}
+            onChange={(e) => setTag(e.target.value.slice(0, MAX_TAG_LENGTH))}
+            placeholder="태그 직접 입력"
+            autoFocus
+            className="mt-2 h-12 w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-transparent px-4 text-base outline-none focus:border-zinc-500 dark:focus:border-zinc-400"
+          />
         )}
       </div>
 
