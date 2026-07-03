@@ -78,7 +78,7 @@ export function validateTransactionInput(
     rate = b.rate;
   } else {
     if (b.rate !== null && b.rate !== undefined) {
-      return err("입출금 거래의 rate 는 null 이어야 합니다.");
+      return err("수입/지출 거래의 rate 는 null 이어야 합니다.");
     }
     rate = null;
   }

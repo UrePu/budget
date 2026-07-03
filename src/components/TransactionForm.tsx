@@ -1,7 +1,7 @@
 "use client";
 
-// 입출금 입력/수정 폼 (환전은 Drawer 의 환전 폼에서 처리)
-// - 입금/출금, 메소/원 segmented 토글
+// 수입/지출 입력/수정 폼 (환전은 Drawer 의 환전 폼에서 처리)
+// - 수입/지출, 메소/원 segmented 토글
 // - 메소는 억 단위로 입력 (예: 3.5 → 3억 5천만 메소), 원화는 콤마 자동 포맷
 // - 메모 대신 태그: 기존 태그 칩에서 선택하거나 새로 입력
 // - 일시(datetime-local, 한국 시간 기준 — 저장 시 UTC ISO 변환)
@@ -226,12 +226,12 @@ export default function TransactionForm({
         options={[
           {
             value: "deposit",
-            label: "입금",
+            label: "수입",
             activeClass: "text-emerald-600 dark:text-emerald-400",
           },
           {
             value: "withdraw",
-            label: "출금",
+            label: "지출",
             activeClass: "text-red-600 dark:text-red-400",
           },
         ]}
