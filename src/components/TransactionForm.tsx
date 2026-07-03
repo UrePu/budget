@@ -29,6 +29,10 @@ const PRESET_TAGS: Record<Currency, string[]> = {
   krw: ["현금화", "충전", "아이템", "기타"],
 };
 
+/** 사냥 태그 전용: 1소재(소울 재획) = 1.3억 메소 — 소재 수로 입력 */
+const SOJAE_TAG = "사냥";
+const MESO_PER_SOJAE = 130_000_000;
+
 interface Props {
   /** 수정 대상 (null 이면 새 거래 입력 모드, 환전 거래는 오지 않음) */
   editing: Transaction | null;
@@ -57,9 +61,10 @@ export default function TransactionForm({
   );
   const [amountText, setAmountText] = useState(() => {
     if (!editing) return "";
-    // 메소는 억 단위 소수로 표시 (350,000,000 → "3.5"), 원화는 콤마 포맷
+    // 메소: 사냥 태그면 소재 수, 아니면 억 단위 소수로 표시. 원화는 콤마 포맷
     if (editing.currency === "meso") {
-      return String(Math.round((editing.amount / MESO_UNIT) * 10_000) / 10_000);
+      const unit = editing.tag === SOJAE_TAG ? MESO_PER_SOJAE : MESO_UNIT;
+      return String(Math.round((editing.amount / unit) * 10_000) / 10_000);
     }
     return addCommas(String(editing.amount));
   });
@@ -87,11 +92,26 @@ export default function TransactionForm({
     return () => clearTimeout(t);
   }, [editing]);
 
-  // 메소는 억 단위 소수 입력("3.5" → 3억 5천만 메소), 원화는 정수(원) 입력
+  // 메소: 사냥 태그면 소재 수("2" → 2.6억), 아니면 억 단위 소수("3.5" → 3억 5천만).
+  // 원화는 정수(원) 입력
+  const isSojae = currency === "meso" && tag.trim() === SOJAE_TAG;
   const amount =
     currency === "meso"
-      ? Math.round((Number(amountText) || 0) * MESO_UNIT)
+      ? Math.round(
+          (Number(amountText) || 0) * (isSojae ? MESO_PER_SOJAE : MESO_UNIT),
+        )
       : parseDigits(amountText);
+
+  /** 태그 변경 — 사냥 여부가 바뀌면 금액 단위(소재 ↔ 억)가 달라지므로 금액 초기화 */
+  function changeTag(next: string) {
+    if (
+      currency === "meso" &&
+      (next === SOJAE_TAG) !== (tag.trim() === SOJAE_TAG)
+    ) {
+      setAmountText("");
+    }
+    setTag(next);
+  }
 
   function handleAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (currency === "meso") {
@@ -249,14 +269,21 @@ export default function TransactionForm({
 
       <div>
         <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">
-          금액 {currency === "meso" ? "(억 메소)" : "(원)"}
+          금액{" "}
+          {isSojae
+            ? "(소재 수 — 1소재 = 1.3억 메소)"
+            : currency === "meso"
+              ? "(억 메소)"
+              : "(원)"}
         </label>
         <input
           ref={amountRef}
           type="text"
           inputMode={currency === "meso" ? "decimal" : "numeric"}
           autoComplete="off"
-          placeholder={currency === "meso" ? "예: 3.5" : "예: 50,000"}
+          placeholder={
+            isSojae ? "예: 2" : currency === "meso" ? "예: 3.5" : "예: 50,000"
+          }
           value={amountText}
           onChange={handleAmountChange}
           className="h-12 w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-transparent px-4 text-lg tabular-nums outline-none focus:border-zinc-500 dark:focus:border-zinc-400"
@@ -286,7 +313,7 @@ export default function TransactionForm({
                 key={s}
                 type="button"
                 onClick={() => {
-                  setTag(active ? "" : s);
+                  changeTag(active ? "" : s);
                   setShowCustomTag(false);
                 }}
                 className={`h-9 rounded-full px-3.5 text-sm font-medium transition active:scale-95 ${
@@ -302,13 +329,8 @@ export default function TransactionForm({
           <button
             type="button"
             onClick={() => {
-              if (showCustomTag) {
-                setShowCustomTag(false);
-                setTag("");
-              } else {
-                setShowCustomTag(true);
-                setTag("");
-              }
+              setShowCustomTag(!showCustomTag);
+              changeTag("");
             }}
             className={`h-9 rounded-full px-3.5 text-sm font-medium transition active:scale-95 ${
               showCustomTag
@@ -323,7 +345,7 @@ export default function TransactionForm({
           <input
             type="text"
             value={tag}
-            onChange={(e) => setTag(e.target.value.slice(0, MAX_TAG_LENGTH))}
+            onChange={(e) => changeTag(e.target.value.slice(0, MAX_TAG_LENGTH))}
             placeholder="태그 직접 입력"
             autoFocus
             className="mt-2 h-12 w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-transparent px-4 text-base outline-none focus:border-zinc-500 dark:focus:border-zinc-400"
