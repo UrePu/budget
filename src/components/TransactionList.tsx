@@ -88,7 +88,12 @@ export default function TransactionList({
                   editingId === t.id ? "bg-zinc-100/70 dark:bg-zinc-800/50" : ""
                 }`}
               >
-                <div className="min-w-0 flex-1">
+                {/* 항목을 탭하면 수정 폼(팝업)이 열린다 */}
+                <button
+                  type="button"
+                  onClick={() => onEdit(t)}
+                  className="min-w-0 flex-1 text-left active:opacity-60 transition"
+                >
                   <AmountLabel t={t} />
                   <p className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
                     {formatTime(t.occurred_at)}
@@ -97,24 +102,18 @@ export default function TransactionList({
                         #{t.tag}
                       </span>
                     )}
+                    <span className="ml-auto text-[11px] text-zinc-400 dark:text-zinc-500">
+                      탭하여 수정
+                    </span>
                   </p>
-                </div>
-                <div className="flex shrink-0 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => onEdit(t)}
-                    className="h-9 rounded-lg px-3 text-sm font-medium text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 active:scale-95 transition"
-                  >
-                    수정
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(t)}
-                    className="h-9 rounded-lg px-3 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 active:scale-95 transition"
-                  >
-                    삭제
-                  </button>
-                </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(t)}
+                  className="h-9 shrink-0 rounded-lg px-3 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 active:scale-95 transition"
+                >
+                  삭제
+                </button>
               </li>
             ))}
           </ul>

@@ -1,7 +1,7 @@
 "use client";
 
 // 메인 화면 클라이언트 컴포넌트 — 상태 관리 및 API 연동
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isExchange, type Transaction } from "@/lib/types";
 import {
@@ -36,7 +36,6 @@ export default function HomeClient() {
   const [editingExchange, setEditingExchange] = useState<Transaction | null>(
     null,
   );
-  const formRef = useRef<HTMLDivElement>(null);
 
   // 401 이면 /login 으로 이동하는 fetch 래퍼
   const apiFetch = useCallback(
@@ -127,8 +126,8 @@ export default function HomeClient() {
       setDrawerOpen(true);
       return;
     }
+    // 수입/지출 거래는 바텀시트 수정 폼으로
     setEditing(t);
-    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function handleDelete(t: Transaction) {
@@ -246,17 +245,40 @@ export default function HomeClient() {
       {/* 요약 카드 — 메소/원화 각각 집계 (필터 반영) */}
       <SummaryCards transactions={visibleTransactions} />
 
-      {/* 입력/수정 폼 */}
-      <div ref={formRef} className="scroll-mt-4">
-        <TransactionForm
-          key={editing ? editing.id : "new"}
-          editing={editing}
-          tagSuggestions={tagSuggestions}
-          apiFetch={apiFetch}
-          onSaved={loadTransactions}
-          onCancelEdit={() => setEditing(null)}
-        />
-      </div>
+      {/* 새 거래 입력 폼 (수정은 목록 항목 탭 → 바텀시트) */}
+      <TransactionForm
+        key="new"
+        editing={null}
+        tagSuggestions={tagSuggestions}
+        apiFetch={apiFetch}
+        onSaved={loadTransactions}
+        onCancelEdit={() => {}}
+      />
+
+      {/* 수정 바텀시트 — 목록의 기록을 탭하면 열린다 */}
+      {editing && (
+        <>
+          <div
+            aria-hidden
+            onClick={() => setEditing(null)}
+            className="fixed inset-0 z-40 bg-black/40"
+          />
+          <div
+            role="dialog"
+            aria-label="거래 수정"
+            className="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-background p-4 pb-8 shadow-2xl"
+          >
+            <TransactionForm
+              key={editing.id}
+              editing={editing}
+              tagSuggestions={tagSuggestions}
+              apiFetch={apiFetch}
+              onSaved={loadTransactions}
+              onCancelEdit={() => setEditing(null)}
+            />
+          </div>
+        </>
+      )}
 
       {/* 거래 목록 */}
       {listError ? (
