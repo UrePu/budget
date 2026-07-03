@@ -212,7 +212,7 @@ export default function HomeClient() {
                   key={tag ?? "__all__"}
                   type="button"
                   onClick={() => setSelectedTag(active ? null : tag)}
-                  className={`h-8 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold transition active:scale-95 ${
+                  className={`h-8 whitespace-nowrap rounded-lg px-2.5 text-[13px] font-semibold transition active:scale-95 ${
                     active
                       ? "bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
                       : "border border-zinc-200 dark:border-zinc-700 bg-card text-zinc-500 dark:text-zinc-400"

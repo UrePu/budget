@@ -309,13 +309,15 @@ export default function TransactionForm({
                   changeTag(active ? "" : s);
                   setShowCustomTag(false);
                 }}
-                className={`h-8 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold transition active:scale-95 ${
+                className={`h-8 whitespace-nowrap rounded-lg px-2.5 text-[13px] font-semibold transition active:scale-95 ${
                   active
                     ? "bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
                     : "border border-zinc-200 dark:border-zinc-700 bg-transparent text-zinc-500 dark:text-zinc-400"
                 }`}
               >
-                {active ? `✓ ${s}` : s}
+                {/* 체크 자리를 항상 확보해 선택 시 칩 길이가 변하지 않게 */}
+                <span className={active ? "" : "opacity-0"}>✓ </span>
+                {s}
               </button>
             );
           })}
@@ -325,7 +327,7 @@ export default function TransactionForm({
               setShowCustomTag(!showCustomTag);
               changeTag("");
             }}
-            className={`h-8 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold transition active:scale-95 ${
+            className={`h-8 whitespace-nowrap rounded-lg px-2.5 text-[13px] font-semibold transition active:scale-95 ${
               showCustomTag
                 ? "bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
                 : "border border-dashed border-zinc-300 dark:border-zinc-600 text-zinc-400 dark:text-zinc-500"
