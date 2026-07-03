@@ -2,12 +2,13 @@
 
 // 거래 입력/수정 폼 — 핵심 UX
 // - 입금/출금, 메소/원 segmented 토글
-// - 금액 콤마 자동 포맷 (내부 상태는 숫자 문자열)
+// - 메소는 억 단위로 입력 (예: 3.5 → 3억 5천만 메소), 원화는 콤마 자동 포맷
 // - 메소 선택 시 시세(1억당 원) 입력 + 실시간 환산 원화 표시
 // - 일시(datetime-local, 한국 시간 기준 — 저장 시 UTC ISO 변환)
 import { useEffect, useRef, useState } from "react";
 import {
   DEFAULT_RATE,
+  MESO_UNIT,
   toKrw,
   type Currency,
   type Transaction,
@@ -47,9 +48,14 @@ export default function TransactionForm({
   const [currency, setCurrency] = useState<Currency>(
     editing?.currency ?? "meso",
   );
-  const [amountText, setAmountText] = useState(() =>
-    editing ? addCommas(String(editing.amount)) : "",
-  );
+  const [amountText, setAmountText] = useState(() => {
+    if (!editing) return "";
+    // 메소는 억 단위 소수로 표시 (350,000,000 → "3.5"), 원화는 콤마 포맷
+    if (editing.currency === "meso") {
+      return String(Math.round((editing.amount / MESO_UNIT) * 10_000) / 10_000);
+    }
+    return addCommas(String(editing.amount));
+  });
   const [rateText, setRateText] = useState(() =>
     editing && editing.currency === "meso" && editing.rate != null
       ? String(editing.rate)
@@ -58,7 +64,6 @@ export default function TransactionForm({
   const [occurredLocal, setOccurredLocal] = useState(() =>
     editing ? utcIsoToLocalInput(editing.occurred_at) : "",
   );
-  const [memo, setMemo] = useState(editing?.memo ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -79,7 +84,11 @@ export default function TransactionForm({
     return () => clearTimeout(t);
   }, [editing]);
 
-  const amount = parseDigits(amountText);
+  // 메소는 억 단위 소수 입력("3.5" → 3억 5천만 메소), 원화는 정수(원) 입력
+  const amount =
+    currency === "meso"
+      ? Math.round((Number(amountText) || 0) * MESO_UNIT)
+      : parseDigits(amountText);
   // rate 는 API 상 소수 허용(예: 1850.5)이므로 콤마만 제거하고 Number 로 파싱한다.
   // (parseDigits 를 쓰면 "1850.5" → 18505 로 잘못 읽힘 — 수정 모드 초기값에서 발생 가능)
   const rateNum = Number(rateText.replace(/,/g, ""));
@@ -90,8 +99,26 @@ export default function TransactionForm({
       : null;
 
   function handleAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const digits = e.target.value.replace(/[^\d]/g, "").slice(0, 15);
-    setAmountText(addCommas(digits));
+    if (currency === "meso") {
+      // 숫자 + 소수점 하나만 허용, 정수부 6자리 / 소수부 4자리 제한
+      const cleaned = e.target.value.replace(/[^\d.]/g, "");
+      const [intPart = "", ...rest] = cleaned.split(".");
+      const decPart = rest.join("");
+      const text =
+        cleaned.includes(".")
+          ? `${intPart.slice(0, 6)}.${decPart.slice(0, 4)}`
+          : intPart.slice(0, 6);
+      setAmountText(text);
+    } else {
+      const digits = e.target.value.replace(/[^\d]/g, "").slice(0, 15);
+      setAmountText(addCommas(digits));
+    }
+  }
+
+  function handleCurrencyChange(c: Currency) {
+    if (c === currency) return;
+    setCurrency(c);
+    setAmountText(""); // 단위(억 ↔ 원)가 달라지므로 금액은 다시 입력
   }
 
   function handleRateChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -101,7 +128,6 @@ export default function TransactionForm({
 
   function resetForm() {
     setAmountText("");
-    setMemo("");
     setOccurredLocal(nowLocalInput());
     setError(null);
   }
@@ -138,7 +164,6 @@ export default function TransactionForm({
       currency,
       amount,
       rate: currency === "meso" ? rate : null,
-      memo: memo.trim() ? memo.trim() : null,
     };
 
     setSaving(true);
@@ -233,7 +258,7 @@ export default function TransactionForm({
       <SegmentedControl<Currency>
         ariaLabel="통화"
         value={currency}
-        onChange={setCurrency}
+        onChange={handleCurrencyChange}
         options={[
           { value: "meso", label: "메소" },
           { value: "krw", label: "원" },
@@ -242,14 +267,14 @@ export default function TransactionForm({
 
       <div>
         <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">
-          금액 {currency === "meso" ? "(메소)" : "(원)"}
+          금액 {currency === "meso" ? "(억 메소)" : "(원)"}
         </label>
         <input
           ref={amountRef}
           type="text"
-          inputMode="numeric"
+          inputMode={currency === "meso" ? "decimal" : "numeric"}
           autoComplete="off"
-          placeholder={currency === "meso" ? "예: 350,000,000" : "예: 50,000"}
+          placeholder={currency === "meso" ? "예: 3.5" : "예: 50,000"}
           value={amountText}
           onChange={handleAmountChange}
           className="h-12 w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-transparent px-4 text-lg tabular-nums outline-none focus:border-zinc-500 dark:focus:border-zinc-400"
@@ -292,19 +317,6 @@ export default function TransactionForm({
           value={occurredLocal}
           onChange={(e) => setOccurredLocal(e.target.value)}
           className="h-12 w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 text-base outline-none focus:border-zinc-500 dark:focus:border-zinc-400"
-        />
-      </div>
-
-      <div>
-        <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">
-          메모 (선택)
-        </label>
-        <input
-          type="text"
-          value={memo}
-          onChange={(e) => setMemo(e.target.value)}
-          placeholder="예: 큐브 구매"
-          className="h-12 w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-transparent px-4 text-base outline-none focus:border-zinc-500 dark:focus:border-zinc-400"
         />
       </div>
 

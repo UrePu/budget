@@ -1,6 +1,6 @@
 "use client";
 
-// 기간 선택: 월간/주간 토글 + ← 라벨 → 이동.
+// 기간 선택: 월간/주간/달력 토글 + ← 라벨 → 이동. (달력은 월 단위로 이동)
 // 가운데 라벨을 탭하면 네이티브 피커(month/date)로 원하는 날짜로 바로 점프할 수 있다.
 // (라벨 위에 투명한 input 을 겹쳐 두는 방식 — showPicker() 미지원 브라우저에서도 동작)
 
@@ -13,7 +13,7 @@ import {
 } from "@/lib/client/time";
 import SegmentedControl from "@/components/SegmentedControl";
 
-export type PeriodMode = "month" | "week";
+export type PeriodMode = "month" | "week" | "calendar";
 
 interface Props {
   mode: PeriodMode;
@@ -32,7 +32,8 @@ export default function PeriodPicker({
   onMonthChange,
   onWeekChange,
 }: Props) {
-  const isMonth = mode === "month";
+  // 달력 모드도 월 단위로 이동/선택한다
+  const isMonth = mode !== "week";
 
   function handlePrev() {
     if (isMonth) onMonthChange(shiftMonth(month, -1));
@@ -51,6 +52,7 @@ export default function PeriodPicker({
         options={[
           { value: "month", label: "월간" },
           { value: "week", label: "주간" },
+          { value: "calendar", label: "달력" },
         ]}
         value={mode}
         onChange={onModeChange}

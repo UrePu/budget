@@ -41,6 +41,24 @@ export function formatSignedMeso(amount: number): string {
   return formatMeso(amount);
 }
 
+/**
+ * 달력 셀용 축약 원화 표기 (부호 포함, ₩ 생략):
+ * 1억 이상 "1.2억" / 1만 이상 "35만" / 그 외 "3,500"
+ */
+export function formatCompactKrw(n: number): string {
+  const rounded = Math.round(n);
+  const sign = rounded > 0 ? "+" : rounded < 0 ? "-" : "";
+  const abs = Math.abs(rounded);
+  if (abs >= 100_000_000) {
+    const eok = Math.round((abs / 100_000_000) * 10) / 10;
+    return `${sign}${eok}억`;
+  }
+  if (abs >= 10_000) {
+    return `${sign}${Math.round(abs / 10_000)}만`;
+  }
+  return `${sign}${abs.toLocaleString("ko-KR")}`;
+}
+
 /** 정수 문자열에 천단위 콤마 삽입 (입력 폼 표시용) */
 export function addCommas(digits: string): string {
   if (!digits) return "";

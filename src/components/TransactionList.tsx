@@ -31,7 +31,7 @@ export default function TransactionList({
   if (transactions.length === 0) {
     return (
       <p className="py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">
-        이 달의 거래가 없습니다.
+        거래 내역이 없습니다.
       </p>
     );
   }
@@ -83,11 +83,6 @@ export default function TransactionList({
                     </p>
                     <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
                       {formatTime(t.occurred_at)}
-                      {t.memo && (
-                        <span className="ml-2 text-zinc-600 dark:text-zinc-300">
-                          {t.memo}
-                        </span>
-                      )}
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-1.5">

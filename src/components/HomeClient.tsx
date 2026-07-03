@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import type { Transaction } from "@/lib/types";
 import {
   currentMonth,
+  dateKey,
   shiftDate,
   todayDateKey,
   weekStartOf,
 } from "@/lib/client/time";
+import CalendarView from "@/components/CalendarView";
 import PeriodPicker, { type PeriodMode } from "@/components/PeriodPicker";
 import SummaryCards from "@/components/SummaryCards";
 import TransactionForm from "@/components/TransactionForm";
@@ -20,6 +22,8 @@ export default function HomeClient() {
   const [mode, setMode] = useState<PeriodMode>("month");
   const [month, setMonth] = useState(() => currentMonth());
   const [weekStart, setWeekStart] = useState(() => weekStartOf(todayDateKey()));
+  // 달력 모드에서 선택한 날짜 (null 이면 월 전체)
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
@@ -42,10 +46,11 @@ export default function HomeClient() {
   const loadTransactions = useCallback(async () => {
     setLoading(true);
     setListError(null);
+    // 월간/달력 모드는 월 범위, 주간 모드는 주 범위로 조회
     const query =
-      mode === "month"
-        ? `month=${month}`
-        : `from=${weekStart}&to=${shiftDate(weekStart, 6)}`;
+      mode === "week"
+        ? `from=${weekStart}&to=${shiftDate(weekStart, 6)}`
+        : `month=${month}`;
     try {
       const res = await apiFetch(`/api/transactions?${query}`);
       if (!res.ok) {
@@ -78,6 +83,12 @@ export default function HomeClient() {
     router.replace("/login");
     router.refresh();
   }
+
+  // 달력 모드에서 날짜를 선택하면 요약/목록을 그 날로 좁힌다
+  const visibleTransactions =
+    mode === "calendar" && selectedDate
+      ? transactions.filter((t) => dateKey(t.occurred_at) === selectedDate)
+      : transactions;
 
   function handleEdit(t: Transaction) {
     setEditing(t);
@@ -117,18 +128,34 @@ export default function HomeClient() {
         </button>
       </header>
 
-      {/* 기간 선택 (월간/주간) */}
+      {/* 기간 선택 (월간/주간/달력) */}
       <PeriodPicker
         mode={mode}
         month={month}
         weekStart={weekStart}
-        onModeChange={setMode}
-        onMonthChange={setMonth}
+        onModeChange={(m) => {
+          setMode(m);
+          setSelectedDate(null);
+        }}
+        onMonthChange={(m) => {
+          setMonth(m);
+          setSelectedDate(null);
+        }}
         onWeekChange={setWeekStart}
       />
 
-      {/* 요약 카드 */}
-      <SummaryCards transactions={transactions} />
+      {/* 달력 (달력 모드) */}
+      {mode === "calendar" && (
+        <CalendarView
+          month={month}
+          transactions={transactions}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+        />
+      )}
+
+      {/* 요약 카드 — 달력에서 날짜 선택 시 그 날 기준 */}
+      <SummaryCards transactions={visibleTransactions} />
 
       {/* 입력/수정 폼 */}
       <div ref={formRef} className="scroll-mt-4">
@@ -155,7 +182,7 @@ export default function HomeClient() {
         </div>
       ) : (
         <TransactionList
-          transactions={transactions}
+          transactions={visibleTransactions}
           loading={loading}
           editingId={editing?.id ?? null}
           onEdit={handleEdit}
