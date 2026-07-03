@@ -309,15 +309,18 @@ export default function TransactionForm({
                   changeTag(active ? "" : s);
                   setShowCustomTag(false);
                 }}
-                className={`h-8 whitespace-nowrap rounded-lg px-2.5 text-[13px] font-semibold transition active:scale-95 ${
+                className={`relative h-8 rounded-lg px-2.5 text-[13px] font-semibold transition active:scale-95 ${
                   active
                     ? "bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
                     : "border border-zinc-200 dark:border-zinc-700 bg-transparent text-zinc-500 dark:text-zinc-400"
                 }`}
               >
-                {/* 체크 자리를 항상 확보해 선택 시 칩 길이가 변하지 않게 */}
-                <span className={active ? "" : "opacity-0"}>✓ </span>
-                {s}
+                {/* 팬텀 텍스트로 "✓ 라벨" 폭을 미리 고정 — 선택돼도 칩 크기 불변 */}
+                <span className="invisible whitespace-nowrap">✓ {s}</span>
+                {/* 실제 표시는 박스 안에서 가운데 정렬, 선택 시 체크가 끼어들며 글자가 밀림 */}
+                <span className="absolute inset-0 flex items-center justify-center whitespace-nowrap">
+                  {active ? `✓ ${s}` : s}
+                </span>
               </button>
             );
           })}
