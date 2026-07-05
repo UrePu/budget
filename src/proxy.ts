@@ -22,8 +22,8 @@ export default async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // /login, /api/auth/login, Next 정적 리소스, favicon, 이미지 파일은 보호 대상에서 제외
+  // /login, /api/auth/login, Next 정적 리소스, favicon, PWA 매니페스트, 이미지 파일은 보호 대상에서 제외
   matcher: [
-    "/((?!login|api/auth/login|_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpg|jpeg|svg|ico|webp)$).*)",
+    "/((?!login|api/auth/login|_next/static|_next/image|favicon\\.ico|manifest\\.webmanifest|.*\\.(?:png|jpg|jpeg|svg|ico|webp)$).*)",
   ],
 };

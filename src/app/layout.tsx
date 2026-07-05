@@ -28,6 +28,12 @@ export const metadata: Metadata = {
   description: "메이플스토리 메소와 원화를 함께 기록하는 개인 가계부",
   applicationName: "메소 가계부",
   formatDetection: { telephone: false },
+  // iOS 홈 화면 추가 시 standalone 실행
+  appleWebApp: {
+    capable: true,
+    title: "메소 가계부",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
