@@ -1,7 +1,7 @@
 "use client";
 
 // 메인 화면 클라이언트 컴포넌트 — 상태 관리 및 API 연동
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isExchange, type Transaction } from "@/lib/types";
 import {
@@ -51,9 +51,13 @@ export default function HomeClient() {
     [router],
   );
 
+  // 마지막으로 목록을 불러온 시각 — 5분 지나서 다시 들어오면 refetch
+  const lastFetchedRef = useRef(0);
+
   const loadTransactions = useCallback(async () => {
     setLoading(true);
     setListError(null);
+    lastFetchedRef.current = Date.now();
     // 월간/달력 모드는 월 범위, 주간 모드는 주 범위로 조회
     const query =
       mode === "week"
@@ -80,6 +84,23 @@ export default function HomeClient() {
     // setState 를 effect 본문에서 동기 호출하지 않도록 태스크로 미룸
     const t = setTimeout(loadTransactions, 0);
     return () => clearTimeout(t);
+  }, [loadTransactions]);
+
+  // 탭/앱으로 다시 돌아왔을 때 마지막 조회가 5분 이상 지났으면 refetch
+  useEffect(() => {
+    const STALE_MS = 5 * 60 * 1000;
+    function refetchIfStale() {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastFetchedRef.current >= STALE_MS) {
+        loadTransactions();
+      }
+    }
+    document.addEventListener("visibilitychange", refetchIfStale);
+    window.addEventListener("focus", refetchIfStale);
+    return () => {
+      document.removeEventListener("visibilitychange", refetchIfStale);
+      window.removeEventListener("focus", refetchIfStale);
+    };
   }, [loadTransactions]);
 
   async function handleLogout() {
