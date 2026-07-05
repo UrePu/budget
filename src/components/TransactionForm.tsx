@@ -324,6 +324,8 @@ export default function TransactionForm({
                 onClick={() => {
                   changeTag(active ? "" : s);
                   setShowCustomTag(false);
+                  // 태그를 고르면 바로 금액 입력으로 포커스 이동
+                  if (!active) amountRef.current?.focus();
                 }}
                 className={`relative h-8 rounded-lg px-2.5 text-[13px] font-semibold transition active:scale-95 ${
                   active
