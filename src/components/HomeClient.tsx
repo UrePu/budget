@@ -92,14 +92,14 @@ export default function HomeClient() {
     router.refresh();
   }
 
-  // 최근 사용 태그 (입력 폼 칩)
+  // 사용한 태그 전체 (입력 폼 칩 — 압축/펼침은 폼에서 처리)
   const tagSuggestions = Array.from(
     new Set(
       transactions
         .map((t) => t.tag)
         .filter((tag): tag is string => tag !== null),
     ),
-  ).slice(0, 8);
+  );
 
   // 달력 모드: 태그 필터 → 날짜 선택 순으로 좁힌다
   const tagFiltered =

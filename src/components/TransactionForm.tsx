@@ -14,7 +14,12 @@ import {
   type TxType,
 } from "@/lib/types";
 import { addCommas, formatMeso, parseDigits } from "@/lib/format";
-import { MESO_PER_SOJAE, PRESET_TAGS, SOJAE_TAG } from "@/lib/tags";
+import {
+  ALL_PRESET_TAGS,
+  MESO_PER_SOJAE,
+  PRESET_TAGS,
+  SOJAE_TAG,
+} from "@/lib/tags";
 import {
   localInputToUtcIso,
   nowLocalInput,
@@ -70,6 +75,8 @@ export default function TransactionForm({
   const [occurredLocal, setOccurredLocal] = useState(() =>
     editing ? utcIsoToLocalInput(editing.occurred_at) : "",
   );
+  // ＋ 버튼으로 모든 태그(전체 프리셋 + 사용한 태그) 펼치기
+  const [showAllTags, setShowAllTags] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const amountRef = useRef<HTMLInputElement>(null);
@@ -292,14 +299,20 @@ export default function TransactionForm({
         <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5">
           태그
         </label>
-        {/* 프리셋 + 최근 사용 태그 — 전부 보이게 여러 줄 랩, 탭 한 번에 자동 입력 */}
+        {/* 프리셋 + 최근 사용 태그 — 기본은 압축, ＋ 버튼으로 모든 태그 펼치기 */}
         <div className="flex flex-wrap gap-1.5 py-0.5">
-          {[
-            ...PRESET_TAGS[currency],
-            ...tagSuggestions
-              .filter((s) => !PRESET_TAGS[currency].includes(s))
-              .slice(0, 4),
-          ].map((s) => {
+          {(() => {
+            const extras = tagSuggestions.filter(
+              (s) => !PRESET_TAGS[currency].includes(s),
+            );
+            const chips = showAllTags
+              ? Array.from(new Set([...ALL_PRESET_TAGS, ...tagSuggestions]))
+              : [...PRESET_TAGS[currency], ...extras.slice(0, 3)];
+            // 선택된 태그가 압축 목록에 없으면 보이도록 추가
+            const selected = tag.trim();
+            if (selected && !chips.includes(selected)) chips.push(selected);
+            return chips;
+          })().map((s) => {
             const active = tag.trim() === s;
             return (
               <button
@@ -324,20 +337,31 @@ export default function TransactionForm({
               </button>
             );
           })}
+          {/* 모든 태그 펼치기/접기 */}
           <button
             type="button"
-            onClick={() => {
-              setShowCustomTag(!showCustomTag);
-              changeTag("");
-            }}
-            className={`h-8 whitespace-nowrap rounded-lg px-2.5 text-[13px] font-semibold transition active:scale-95 ${
-              showCustomTag
-                ? "bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
-                : "border border-dashed border-zinc-300 dark:border-zinc-600 text-zinc-400 dark:text-zinc-500"
-            }`}
+            aria-label={showAllTags ? "태그 접기" : "모든 태그 보기"}
+            onClick={() => setShowAllTags(!showAllTags)}
+            className="h-8 w-9 whitespace-nowrap rounded-lg border border-dashed border-zinc-300 dark:border-zinc-600 text-[15px] font-semibold text-zinc-400 dark:text-zinc-500 transition active:scale-95"
           >
-            ＋ 직접 입력
+            {showAllTags ? "－" : "＋"}
           </button>
+          {showAllTags && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowCustomTag(!showCustomTag);
+                changeTag("");
+              }}
+              className={`h-8 whitespace-nowrap rounded-lg px-2.5 text-[13px] font-semibold transition active:scale-95 ${
+                showCustomTag
+                  ? "bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
+                  : "border border-dashed border-zinc-300 dark:border-zinc-600 text-zinc-400 dark:text-zinc-500"
+              }`}
+            >
+              직접 입력
+            </button>
+          )}
         </div>
         {showCustomTag && (
           <input
