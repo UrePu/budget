@@ -16,6 +16,7 @@ import {
 import { addCommas, formatMeso, parseDigits } from "@/lib/format";
 import {
   ALL_PRESET_TAGS,
+  EXCHANGE_TAG,
   MESO_PER_SOJAE,
   PRESET_TAGS,
   SOJAE_TAG,
@@ -302,11 +303,13 @@ export default function TransactionForm({
         {/* 프리셋 + 최근 사용 태그 — 기본은 압축, ＋ 버튼으로 모든 태그 펼치기 */}
         <div className="flex flex-wrap gap-1.5 py-0.5">
           {(() => {
-            const extras = tagSuggestions.filter(
+            // 환전 태그는 환전 폼에서 자동 부여 — 수동 선택 목록에서 숨김
+            const usable = tagSuggestions.filter((s) => s !== EXCHANGE_TAG);
+            const extras = usable.filter(
               (s) => !PRESET_TAGS[currency].includes(s),
             );
             const chips = showAllTags
-              ? Array.from(new Set([...ALL_PRESET_TAGS, ...tagSuggestions]))
+              ? Array.from(new Set([...ALL_PRESET_TAGS, ...usable]))
               : [...PRESET_TAGS[currency], ...extras.slice(0, 3)];
             // 선택된 태그가 압축 목록에 없으면 보이도록 추가
             const selected = tag.trim();
