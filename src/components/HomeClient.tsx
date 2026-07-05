@@ -2,6 +2,7 @@
 
 // 메인 화면 클라이언트 컴포넌트 — 상태 관리 및 API 연동
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { isExchange, type Transaction } from "@/lib/types";
 import {
@@ -185,6 +186,14 @@ export default function HomeClient() {
         >
           ☰
         </button>
+        <Image
+          src="/meso-bag.png"
+          alt=""
+          width={28}
+          height={28}
+          className="[image-rendering:pixelated]"
+          priority
+        />
         <h1 className="text-xl font-bold tracking-tight">메소 가계부</h1>
       </header>
 

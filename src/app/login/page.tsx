@@ -4,6 +4,7 @@
 // "로그인": 기존 비밀번호로 입장.
 // "새 가계부 만들기": 가입 코드(REGISTER_CODE)를 아는 사람만 새 계정 생성 가능.
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -57,6 +58,14 @@ export default function LoginPage() {
           className="rounded-2xl bg-card p-6 shadow-sm border border-black/5 dark:border-white/10 flex flex-col gap-4"
         >
           <div className="text-center">
+            <Image
+              src="/meso-bag.png"
+              alt=""
+              width={56}
+              height={56}
+              className="mx-auto mb-2 [image-rendering:pixelated]"
+              priority
+            />
             <h1 className="text-2xl font-bold tracking-tight">메소 가계부</h1>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
               비밀번호마다 가계부가 따로 저장됩니다
