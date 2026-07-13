@@ -76,6 +76,8 @@ export default function TransactionForm({
   const [occurredLocal, setOccurredLocal] = useState(() =>
     editing ? utcIsoToLocalInput(editing.occurred_at) : "",
   );
+  // 일시를 직접 수정했는지 — 자동 입력값 그대로면 제출 시점의 현재 시각으로 갱신
+  const [occurredTouched, setOccurredTouched] = useState(!!editing);
   // ＋ 버튼으로 모든 태그(전체 프리셋 + 사용한 태그) 펼치기
   const [showAllTags, setShowAllTags] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -143,6 +145,7 @@ export default function TransactionForm({
     setTag(currency === "meso" ? SOJAE_TAG : "");
     setShowCustomTag(false);
     setOccurredLocal(nowLocalInput());
+    setOccurredTouched(false);
     setError(null);
   }
 
@@ -155,17 +158,23 @@ export default function TransactionForm({
       amountRef.current?.focus();
       return;
     }
-    if (!occurredLocal) {
-      setError("일시를 입력해 주세요.");
-      return;
-    }
-
+    // 제출 시점 기준으로 시간 재확인 — 폼을 열어두고 나중에 저장해도
+    // 일시를 직접 만지지 않았다면 "지금"으로 저장한다.
     let occurredAtIso: string;
-    try {
-      occurredAtIso = localInputToUtcIso(occurredLocal);
-    } catch {
-      setError("일시 형식이 올바르지 않습니다.");
-      return;
+    if (!editing && !occurredTouched) {
+      occurredAtIso = new Date().toISOString();
+      setOccurredLocal(nowLocalInput());
+    } else {
+      if (!occurredLocal) {
+        setError("일시를 입력해 주세요.");
+        return;
+      }
+      try {
+        occurredAtIso = localInputToUtcIso(occurredLocal);
+      } catch {
+        setError("일시 형식이 올바르지 않습니다.");
+        return;
+      }
     }
 
     const input: TransactionInput = {
@@ -180,6 +189,10 @@ export default function TransactionForm({
     setSaving(true);
     setError(null);
     try {
+      // 저장 전에 세션을 새로고침 — 만료됐으면 여기서 로그인으로 이동,
+      // 살아있으면 만료가 30일 뒤로 연장된다.
+      await apiFetch("/api/auth/refresh", { method: "POST" });
+
       const res = editing
         ? await apiFetch(`/api/transactions/${editing.id}`, {
             method: "PATCH",
@@ -387,7 +400,10 @@ export default function TransactionForm({
         <input
           type="datetime-local"
           value={occurredLocal}
-          onChange={(e) => setOccurredLocal(e.target.value)}
+          onChange={(e) => {
+            setOccurredLocal(e.target.value);
+            setOccurredTouched(true);
+          }}
           className="h-12 w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 text-base outline-none focus:border-zinc-500 dark:focus:border-zinc-400"
         />
       </div>

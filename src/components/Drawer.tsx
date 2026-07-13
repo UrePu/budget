@@ -164,6 +164,8 @@ function ExchangeForm({
   const [occurredLocal, setOccurredLocal] = useState(() =>
     editing ? utcIsoToLocalInput(editing.occurred_at) : "",
   );
+  // 일시를 직접 수정했는지 — 자동 입력값 그대로면 제출 시점의 현재 시각으로 갱신
+  const [occurredTouched, setOccurredTouched] = useState(!!editing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -199,13 +201,19 @@ function ExchangeForm({
     if (saving) return;
     if (amount <= 0) return setError("메소 양을 입력해 주세요.");
     if (rate <= 0) return setError("시세(1억당 원)를 입력해 주세요.");
-    if (!occurredLocal) return setError("일시를 입력해 주세요.");
 
+    // 제출 시점 기준으로 시간 재확인 (일시를 직접 만지지 않았다면 지금으로)
     let occurredAtIso: string;
-    try {
-      occurredAtIso = localInputToUtcIso(occurredLocal);
-    } catch {
-      return setError("일시 형식이 올바르지 않습니다.");
+    if (!editing && !occurredTouched) {
+      occurredAtIso = new Date().toISOString();
+      setOccurredLocal(nowLocalInput());
+    } else {
+      if (!occurredLocal) return setError("일시를 입력해 주세요.");
+      try {
+        occurredAtIso = localInputToUtcIso(occurredLocal);
+      } catch {
+        return setError("일시 형식이 올바르지 않습니다.");
+      }
     }
 
     const input = {
@@ -220,6 +228,9 @@ function ExchangeForm({
     setSaving(true);
     setError(null);
     try {
+      // 저장 전에 세션 새로고침 (만료 확인 + 30일 연장)
+      await apiFetch("/api/auth/refresh", { method: "POST" });
+
       const res = editing
         ? await apiFetch(`/api/transactions/${editing.id}`, {
             method: "PATCH",
@@ -324,7 +335,10 @@ function ExchangeForm({
         <input
           type="datetime-local"
           value={occurredLocal}
-          onChange={(e) => setOccurredLocal(e.target.value)}
+          onChange={(e) => {
+            setOccurredLocal(e.target.value);
+            setOccurredTouched(true);
+          }}
           className="h-12 w-full rounded-xl border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 text-base outline-none focus:border-zinc-500 dark:focus:border-zinc-400"
         />
       </div>
